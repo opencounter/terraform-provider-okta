@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"unicode"
 
+	"github.com/okta/okta-sdk-golang/okta"
+
 	articulateOkta "github.com/articulate/oktasdk-go/okta"
 	"github.com/hashicorp/terraform/helper/schema"
 )
@@ -104,10 +106,30 @@ func suppressDefaultedArrayDiff(k, old, new string, d *schema.ResourceData) bool
 	return new == "0"
 }
 
+func getOktaClientFromMetadata(meta interface{}) *okta.Client {
+	return meta.(*Config).oktaClient
+}
+
 func validatePriority(in int, out int) error {
 	if in > 0 && in != out {
 		return fmt.Errorf("provided priority was not valid, got: %d, API responded with: %d. See schema for attribute details", in, out)
 	}
 
 	return nil
+}
+
+// Allows you to chain multiple validation functions
+func createValidationChain(validationChain ...schema.SchemaValidateFunc) schema.SchemaValidateFunc {
+	return func(val interface{}, key string) ([]string, []error) {
+		var warningList []string
+		var errorList []error
+
+		for _, cb := range validationChain {
+			warnings, errors := cb(val, key)
+			errorList = append(errorList, errors...)
+			warningList = append(warningList, warnings...)
+		}
+
+		return warningList, errorList
+	}
 }
