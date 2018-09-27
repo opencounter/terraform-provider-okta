@@ -20,6 +20,7 @@ func TestMain(m *testing.M) {
 	setupSweeper(signOnPolicy, deleteSignOnPolicies)
 	setupSweeper(signOnPolicyRule, deleteSignOnPolicyRules)
 	setupSweeper(passwordPolicyRule, deletePasswordPolicyRules)
+	setupSweeper(oAuthApp, deleteOAuthApps)
 	resource.TestMain(m)
 }
 
