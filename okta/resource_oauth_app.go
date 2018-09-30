@@ -42,12 +42,12 @@ func resourceOAuthApp() *schema.Resource {
 			},
 			"client_id": &schema.Schema{
 				Type:        schema.TypeString,
-				Required:    true,
+				Computed:    true,
 				Description: "OAuth client ID.",
 			},
 			"client_secret": &schema.Schema{
 				Type:        schema.TypeString,
-				Required:    true,
+				Computed:    true,
 				Description: "OAuth client secret key.",
 			},
 			"token_endpoint_auth_method": &schema.Schema{

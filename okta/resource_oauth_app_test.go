@@ -2,6 +2,7 @@ package okta
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 
 func deleteOAuthApps(artClient *articulateOkta.Client, client *okta.Client) error {
 	appList, _, err := client.Application.ListApplications(nil)
+	runtime.Breakpoint()
 
 	if err != nil {
 		return err
@@ -90,8 +92,8 @@ func testOktaOAuthApplication(rInt int) string {
 resource "%s" "%s" {
   name        = "%s"
   type		  = "web"
-  status      = "ACTIVE"
   label = "Rise and shine"
+  grant_types = [ "token" ]
 }
 `, oAuthApp, name, name)
 }
@@ -103,8 +105,8 @@ func testOktaOAuthApplicationUpdated(rInt int) string {
 resource "%s" "%s" {
   name        = "%s"
   type		  = "browser"
-  status      = "INACTIVE"
   label = "Rise and shine UPDATED"
+  grant_types = [ "token" ]
 }
 `, oAuthApp, name, name)
 }
