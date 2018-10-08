@@ -18,6 +18,7 @@ func init() {
 	testAccProviders = map[string]terraform.ResourceProvider{
 		"okta": testAccProvider,
 	}
+
 }
 
 func TestProvider(t *testing.T) {
