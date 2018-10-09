@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
+	"testing"
+
+	"github.com/hashicorp/terraform/terraform"
 
 	jsonParser "github.com/hashicorp/hcl/json/parser"
 	"github.com/hashicorp/terraform/helper/acctest"
@@ -27,12 +31,9 @@ import (
 type (
 	accTestManager struct {
 		// You have to opt out of this testing.
-		blacklist []string
-		// test cases mapped to proper resources
-		testCases  map[string][]*resource.TestCase
-		assertions map[string]resource.TestCheckFunc
-		rawConfig  map[string]interface{}
-		config     string
+		blacklist         []string
+		resourceProviders map[string]terraform.ResourceProvider
+		preCheck          func(*testing.T)
 	}
 
 	resourceTest struct {
@@ -58,21 +59,38 @@ func (manager *accTestManager) Blacklist(resourceName string) {
 	manager.blacklist = append(manager.blacklist, resourceName)
 }
 
-func (manager *accTestManager) Init(provider *schema.Provider) {
-	for resourceKey, resourceObj := range provider.ResourcesMap {
-		// Ignore blacklisted resources, good ol' opt out strategy, gotta test your code bro.
-		if contains(manager.blacklist, resourceKey) {
-			continue
-		}
+func NewAccTestManager(resourceProviders map[string]terraform.ResourceProvider, preCheck func(*testing.T)) *accTestManager {
+	return &accTestManager{
+		resourceProviders: resourceProviders,
+		preCheck:          preCheck,
+	}
+}
 
-		configWalker := NewConfigWalker()
-		configWalker.Run(resourceObj.Schema)
-		conf, err := configWalker.GetConfig(resourceKey, resourceName)
+func (manager *accTestManager) Init(t *testing.T) {
+	for _, provider := range manager.resourceProviders {
+		provider := provider.(*schema.Provider)
+		for resourceKey, resourceObj := range provider.ResourcesMap {
+			// Ignore blacklisted resources, good ol' opt out strategy, gotta test your code bro.
+			if contains(manager.blacklist, resourceKey) {
+				continue
+			}
 
-		if err != nil {
-			panic(fmt.Sprintf("failed to build automated ACC tests. Error %v", err))
+			configWalker := NewConfigWalker()
+			configWalker.Run(resourceObj.Schema)
+			testCases, err := configWalker.GetTestCases(resourceKey)
+
+			for _, test := range testCases {
+				t.Run(test.name, func(nested *testing.T) {
+					test.testCase.PreCheck = func() { manager.preCheck(nested) }
+					test.testCase.Providers = manager.resourceProviders
+					resource.Test(nested, test.testCase)
+				})
+			}
+
+			if err != nil {
+				panic(fmt.Sprintf("failed to build automated ACC tests. Error %v", err))
+			}
 		}
-		assertions := configWalker.GetAssertions(resourceName)
 	}
 }
 
@@ -154,5 +172,5 @@ func wrapHCL(config string, resourceType string, resourceName string) string {
 	return fmt.Sprintf(`
 resource "%s" "%s" {
 	%s
-}`, resourceType, resourceName, config)
+}`, resourceType, strings.Replace(resourceName, fmt.Sprintf("%s.", resourceType), "", -1), config)
 }

@@ -27,7 +27,7 @@ func resourceUser() *schema.Resource {
 				Type:        schema.TypeList,
 				Optional:    true,
 				Description: "User Okta admin roles - ie. ['APP_ADMIN', 'USER_ADMIN']",
-				Elem:        &schema.Schema{Type: schema.TypeString},
+				Elem:        &schema.Schema{Type: schema.TypeString, Description: "Example: \"USER_ADMIN\""},
 			},
 			"city": &schema.Schema{
 				Type:        schema.TypeString,
@@ -169,7 +169,7 @@ func resourceUser() *schema.Resource {
 			"status": &schema.Schema{
 				Type:         schema.TypeString,
 				Optional:     true,
-				Description:  "The status of the User in Okta - remove to set user back to active/provisioned",
+				Description:  "The status of the User in Okta - remove to set user back to active/provisioned. Example: \"STAGED\"",
 				Default:      "ACTIVE",
 				ValidateFunc: validation.StringInSlice([]string{"ACTIVE", "STAGED", "DEPROVISIONED", "SUSPENDED"}, false),
 				// ignore diff changing to ACTIVE if state is set to PROVISIONED

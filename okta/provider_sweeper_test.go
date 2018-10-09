@@ -30,6 +30,11 @@ func TestMain(m *testing.M) {
 	resource.TestMain(m)
 }
 
+func TestProviderAutomation(t *testing.T) {
+	manager := NewAccTestManager(testAccProviders, testAccPreCheck)
+	manager.Init(t)
+}
+
 // Sets up sweeper to clean up dangling resources
 func setupSweeper(resourceType string, del func(*testClient) error) {
 	resource.AddTestSweepers(resourceType, &resource.Sweeper{

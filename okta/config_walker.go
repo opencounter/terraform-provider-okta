@@ -1,17 +1,18 @@
 package okta
 
 import (
+	"fmt"
 	"strings"
-	"testing"
+
+	"github.com/hashicorp/terraform/helper/acctest"
 
 	"github.com/Jeffail/gabs"
-	"github.com/hashicorp/terraform/helper/acctest"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
 type (
-	configWalker struct {
+	ConfigWalker struct {
 		keys   [][]string
 		config *configMap
 		index  int
@@ -21,12 +22,18 @@ type (
 		basic *gabs.Container
 		full  *gabs.Container
 	}
+
+	testCase struct {
+		name         string
+		resourceName string
+		testCase     resource.TestCase
+	}
 )
 
 // NewConfigWalker creates a new config walker
-func NewConfigWalker() *configWalker {
-	return &configWalker{
-		keys: [][]string{},
+func NewConfigWalker() *ConfigWalker {
+	return &ConfigWalker{
+		keys: [][]string{[]string{}},
 		config: &configMap{
 			basic: gabs.New(),
 			full:  gabs.New(),
@@ -35,64 +42,57 @@ func NewConfigWalker() *configWalker {
 	}
 }
 
-func (c *configWalker) GetTestCases(resourceType string, resourceName string) ([]resource.TestCase, error) {
-	testCases := []resource.TestCase{}
-	basic, err := toHCL(c.config.basic.String())
+func (c *ConfigWalker) GetTestCases(resourceType string) ([]testCase, error) {
+	basicToFull, err := c.buildTestCase(resourceType, c.config.basic, c.config.full)
 	if err != nil {
-		return configObj, err
+		return nil, err
 	}
-	basic = wrapHCL(basic, resourceType, resourceName)
-	basicAssertions := c.getAssertion(resourceName, c.config.basic)
-	full, err := toHCL(c.config.full.String())
+
+	fullToBasic, err := c.buildTestCase(resourceType, c.config.full, c.config.basic)
 	if err != nil {
-		return configObj, err
+		return nil, err
 	}
-	full = wrapHCL(full, resourceType, resourceName)
-	fullAssertions := c.getAssertion(resourceName, c.config.full)
 
-	basicTestStep := buildTestStep(basic, resourceName, basicAssertions)
-	fullTestStep := buildTestStep(full, resourceName, fullAssertions)
-
-	basicToFull := []resource.TestStep{
-		basicTestStep,
-		fullTestStep,
-	}
-	fullToBasic := []resource.TestStep{
-		basicTestStep,
-		fullTestStep,
-	}
-	testCases := buildTestCase()
-
-	return testCases, err
+	return []testCase{basicToFull, fullToBasic}, nil
 }
 
-func buildTestStep(config string, resourceName string, check resource.TestCheckFunc) resource.TestStep {
+func (c *ConfigWalker) buildTestCase(resourceType string, configList ...*gabs.Container) (testCase, error) {
+	var (
+		test  testCase
+		steps []resource.TestStep
+	)
+	id := acctest.RandInt()
+	resourceName := fmt.Sprintf("%s.test-acc-%v", resourceType, id)
+
+	for _, conf := range configList {
+		raw, err := toHCL(conf.String())
+		if err != nil {
+			return test, err
+		}
+		raw = wrapHCL(raw, resourceType, resourceName)
+		steps = append(steps, resource.TestStep{
+			Config: raw,
+			Check:  c.getAssertion(resourceName, conf),
+		})
+	}
+
+	return testCase{
+		name:         fmt.Sprintf("TestAutomatedAcc_%s", resourceType),
+		resourceName: resourceName,
+		testCase: resource.TestCase{
+			Steps: steps,
+		},
+	}, nil
+}
+
+func buildTestStep(config string, check resource.TestCheckFunc) resource.TestStep {
 	return resource.TestStep{
 		Config: config,
 		Check:  check,
 	}
 }
 
-func buildTestCase(t testing.T, resourceType string, checkDestroy resource.TestCheckFunc, steps []resource.TestStep) resource.TestCase {
-	ri := acctest.RandInt()
-	resourceName := buildResourceFQN(resourceType, ri)
-
-	return resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: checkDestroy,
-		Steps:        steps,
-	}
-}
-
-func (c *configWalker) GetAssertions(resourceName string) map[string]resource.TestCheckFunc {
-	return map[string]resource.TestCheckFunc{
-		"basic": ,
-		"full":  c.getAssertion(resourceName, c.config.full),
-	}
-}
-
-func (c *configWalker) getAssertion(resourceName string, config *gabs.Container) resource.TestCheckFunc {
+func (c *ConfigWalker) getAssertion(resourceName string, config *gabs.Container) resource.TestCheckFunc {
 	arr := make([]resource.TestCheckFunc, len(c.keys))
 
 	for i, arrKey := range c.keys {
@@ -108,7 +108,7 @@ func (c *configWalker) getAssertion(resourceName string, config *gabs.Container)
 }
 
 // Run starts configuration test process
-func (c *configWalker) Run(resourceSchema map[string]*schema.Schema) {
+func (c *ConfigWalker) Run(resourceSchema map[string]*schema.Schema) {
 	for key, value := range resourceSchema {
 		c.keys[c.index] = []string{key}
 		c.Walk(value)
@@ -117,7 +117,7 @@ func (c *configWalker) Run(resourceSchema map[string]*schema.Schema) {
 
 // Walk recursively walks config. Builds keys based on current index, every branch of possible config value gets
 // a new key. Each key is a slice of strings which eventually will be joined with ".".
-func (c *configWalker) Walk(value *schema.Schema) {
+func (c *ConfigWalker) Walk(value *schema.Schema) {
 	if isPrimitive(value.Type) {
 		if value.Computed != true {
 			exampleValue := getStringExample(value)
@@ -131,10 +131,13 @@ func (c *configWalker) Walk(value *schema.Schema) {
 		switch value.Type {
 		case schema.TypeMap:
 			// And it begins exponentially growing!
-			for key, nestedValue := range value.Elem.(map[string]*schema.Schema) {
-				c.keys[c.index] = append(c.keys[c.index], key)
-				c.Walk(nestedValue)
-				c.index++
+			if value.Elem != nil {
+				for key, nestedValue := range value.Elem.(map[string]*schema.Schema) {
+					c.keys[c.index] = append(c.keys[c.index], key)
+					c.Walk(nestedValue)
+					c.index++
+					c.keys = append(c.keys, []string{})
+				}
 			}
 			break
 		case schema.TypeList:
@@ -143,6 +146,7 @@ func (c *configWalker) Walk(value *schema.Schema) {
 			c.keys[c.index] = append(c.keys[c.index], "0")
 			c.Walk(value.Elem.(*schema.Schema))
 			c.index++
+			c.keys = append(c.keys, []string{})
 		}
 	}
 }
