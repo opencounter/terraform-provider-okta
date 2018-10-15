@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-yaml/yaml"
 
 	"github.com/hashicorp/terraform/terraform"
 
 	jsonParser "github.com/hashicorp/hcl/json/parser"
-	"github.com/hashicorp/terraform/helper/acctest"
 
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/printer"
@@ -31,8 +33,9 @@ import (
 type (
 	accTestManager struct {
 		// You have to opt out of this testing.
-		blacklist         []string
 		resourceProviders map[string]terraform.ResourceProvider
+		testableResources map[string]*schema.Resource
+		testConfig        map[string]*testConfig
 		preCheck          func(*testing.T)
 	}
 
@@ -41,9 +44,29 @@ type (
 		// Helper used to build dynamic test config. Will build this dynamically and do runtime conversions to HCL
 		jsonConfig *gabs.Container
 	}
+
+	testConfig struct {
+		Properties map[string]interface{}     `json:"properties,omitempty"`
+		Tests      map[string]*testCaseConfig `json:"tests,omitempty"`
+	}
+
+	testCaseConfig struct {
+		Description string        `json:"description,omitempty"`
+		Steps       []*stepConfig `json:"steps,omitempty"`
+	}
+
+	stepConfig struct {
+		Type       string                 `json:"type,omitempty"`
+		Properties map[string]interface{} `json:"properties,omitempty"`
+	}
 )
 
-// Hashicorp helper for this?
+var automatedTestTypes = []string{
+	"basic",
+	"infer",
+	"custom",
+}
+
 var primitives = []schema.ValueType{
 	schema.TypeString,
 	schema.TypeBool,
@@ -51,83 +74,67 @@ var primitives = []schema.ValueType{
 	schema.TypeFloat,
 }
 
-// We want to grab everything in between quotes after example
-// Don't care about case. We grab multiples as I would like to expand this in the future.
-var exampleRx = regexp.MustCompile(`(?i).+?example:?\W?"(.+?)"`)
-
-func (manager *accTestManager) Blacklist(resourceName string) {
-	manager.blacklist = append(manager.blacklist, resourceName)
-}
-
+// NewAccTestManager sets up a per provider ACC test automation manager
 func NewAccTestManager(resourceProviders map[string]terraform.ResourceProvider, preCheck func(*testing.T)) *accTestManager {
 	return &accTestManager{
 		resourceProviders: resourceProviders,
 		preCheck:          preCheck,
+		testConfig:        map[string]*testConfig{},
+		testableResources: map[string]*schema.Resource{},
 	}
 }
 
-func (manager *accTestManager) Init(t *testing.T) {
-	for _, provider := range manager.resourceProviders {
-		provider := provider.(*schema.Provider)
-		for resourceKey, resourceObj := range provider.ResourcesMap {
-			// Ignore blacklisted resources, good ol' opt out strategy, gotta test your code bro.
-			if contains(manager.blacklist, resourceKey) {
-				continue
-			}
+func (manager *accTestManager) Run(t *testing.T) {
+	manager.loadManifest(t)
+	for resourceKey, resourceObj := range manager.testableResources {
+		configWalker := NewConfigWalker(manager.testConfig[resourceKey])
+		configWalker.Run(resourceObj.Schema)
+		testCases, err := configWalker.GetTestCases(resourceKey)
 
-			configWalker := NewConfigWalker()
-			configWalker.Run(resourceObj.Schema)
-			testCases, err := configWalker.GetTestCases(resourceKey)
+		for _, test := range testCases {
+			t.Run(test.name, func(nested *testing.T) {
+				test.testCase.PreCheck = func() { manager.preCheck(nested) }
+				test.testCase.Providers = manager.resourceProviders
+				resource.Test(nested, test.testCase)
+			})
+		}
 
-			for _, test := range testCases {
-				t.Run(test.name, func(nested *testing.T) {
-					test.testCase.PreCheck = func() { manager.preCheck(nested) }
-					test.testCase.Providers = manager.resourceProviders
-					resource.Test(nested, test.testCase)
-				})
-			}
-
-			if err != nil {
-				panic(fmt.Sprintf("failed to build automated ACC tests. Error %v", err))
-			}
+		if err != nil {
+			t.Fatalf("failed to build automated ACC tests. Error %v", err)
 		}
 	}
 }
 
-func getExample(desc string) string {
-	results := exampleRx.FindAllString(desc, 0)
+func loadAndParse(file string, thing interface{}, t *testing.T) {
+	absPath, _ := filepath.Abs(filepath.Join("./okta/tests", file))
+	raw, err := ioutil.ReadFile(absPath)
 
-	// Perhaps allow multiple tests in a predictable way.
-	if results != nil {
-		return results[0]
+	if err != nil {
+		t.Fatalf("failed to load file. Error %v", err)
 	}
 
-	return ""
+	err = yaml.Unmarshal(raw, thing)
+
+	if err != nil {
+		t.Fatalf("failed to parse config file. Error %v", err)
+	}
 }
 
-func getStringExample(v *schema.Schema) string {
-	str := getExample(v.Description)
+func (manager *accTestManager) loadManifest(t *testing.T) {
+	var (
+		manifest map[string]string
+		test     *testConfig
+	)
+	loadAndParse("./manifest.yaml", &manifest, t)
 
-	// Defaulting logic, not guaranteed to work. It is preferrable to pass me an example.
-	if str == "" {
-		switch v.Type {
-		case schema.TypeString:
-			return acctest.RandString(10)
-		case schema.TypeBool:
-			if v.Default == true {
-				return "false"
-			}
-			return "true"
-		case schema.TypeInt:
-		case schema.TypeFloat:
-			return string(acctest.RandInt())
+	for key, fileName := range manifest {
+		p := manager.resourceProviders["okta"].(*schema.Provider)
+		if p.ResourcesMap[key] != nil {
+			manager.testableResources[key] = p.ResourcesMap[key]
+			loadAndParse(fileName, &test, t)
+			manager.testConfig[key] = test
 		}
 	}
-
-	return str
-}
-
-func buildBasicTestCase(resourceSchema map[string]*schema.Schema) {
 }
 
 func isPrimitive(propType schema.ValueType) bool {

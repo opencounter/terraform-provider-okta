@@ -15,7 +15,7 @@ type testClient struct {
 	artClient  *articulateOkta.Client
 }
 
-var testResourcePrefix = "testAcc"
+var testResourcePrefix = "test-acc"
 
 // TestMain overridden main testing function. Package level BeforeAll and AfterAll.
 // It also delineates between acceptance tests and unit tests
@@ -28,11 +28,6 @@ func TestMain(m *testing.M) {
 	// Cannot sweep application resources as there is a bug with listing applications.
 	// setupSweeper(oAuthApp, deleteOAuthApps)
 	resource.TestMain(m)
-}
-
-func TestProviderAutomation(t *testing.T) {
-	manager := NewAccTestManager(testAccProviders, testAccPreCheck)
-	manager.Init(t)
 }
 
 // Sets up sweeper to clean up dangling resources

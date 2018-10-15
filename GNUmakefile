@@ -38,6 +38,9 @@ test: fmtcheck
 testacc: fmtcheck sweep
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
 
+test-automated: fmtcheck sweep
+	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -test.run TestProviderAutomation* -timeout 120m
+
 # Sweeps up leaked dangling resources
 sweep:
 	@echo "WARNING: This will destroy resources. Use only in development accounts."

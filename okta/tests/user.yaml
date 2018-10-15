@@ -1,0 +1,25 @@
+properties:
+  login: test@gmail.com
+  email: test@gmail.com
+  admin_roles:
+    - USER_ADMIN
+  locale: en_US
+  timezone: America/New_York
+  preferred_language: en-gb
+  second_email: "" 
+  status: ACTIVE
+tests:
+  basic:
+    description: test creating a bare bones user and update it with all required fields
+    steps:
+      - type: basic
+      - type: full 
+  inactiveUser:
+    description: Create an INACTIVE user then update it to ACTIVE  
+    steps:
+      - type: full 
+      - type: full 
+        properties:
+          admin_roles:
+            - APP_ADMIN 
+          login: test-changed@gmail.com

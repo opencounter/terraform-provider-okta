@@ -103,3 +103,7 @@ func TestAccOktaProviderRegistration_oktaSDK(t *testing.T) {
 		t.Fatalf("Error testing connection to Okta via the Official Okta SDK. Please verify your credentials: %v", err)
 	}
 }
+
+func TestProviderAutomation(t *testing.T) {
+	NewAccTestManager(testAccProviders, testAccPreCheck).Run(t)
+}

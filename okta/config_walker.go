@@ -1,7 +1,9 @@
 package okta
 
 import (
+	"encoding/json"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/hashicorp/terraform/helper/acctest"
@@ -13,14 +15,16 @@ import (
 
 type (
 	ConfigWalker struct {
-		keys   [][]string
-		config *configMap
-		index  int
+		keys       [][]string
+		config     *configMap
+		index      int
+		testConfig *testConfig
 	}
 
 	configMap struct {
-		basic *gabs.Container
-		full  *gabs.Container
+		basic        *gabs.Container
+		full         *gabs.Container
+		dynamicTests []*gabs.Container
 	}
 
 	testCase struct {
@@ -31,32 +35,34 @@ type (
 )
 
 // NewConfigWalker creates a new config walker
-func NewConfigWalker() *ConfigWalker {
+func NewConfigWalker(config *testConfig) *ConfigWalker {
 	return &ConfigWalker{
-		keys: [][]string{[]string{}},
+		keys: [][]string{},
 		config: &configMap{
 			basic: gabs.New(),
 			full:  gabs.New(),
 		},
-		index: 0,
+		index:      0,
+		testConfig: config,
 	}
 }
 
+// GetTestCases builds test cases after walking resource schemas
 func (c *ConfigWalker) GetTestCases(resourceType string) ([]testCase, error) {
-	basicToFull, err := c.buildTestCase(resourceType, c.config.basic, c.config.full)
-	if err != nil {
-		return nil, err
+	var cases []testCase
+
+	for _, config := range c.testConfig.Tests {
+		tCase, err := c.buildTestCase(resourceType, config, c.testConfig.Properties)
+		if err != nil {
+			return cases, err
+		}
+		cases = append(cases, tCase)
 	}
 
-	fullToBasic, err := c.buildTestCase(resourceType, c.config.full, c.config.basic)
-	if err != nil {
-		return nil, err
-	}
-
-	return []testCase{basicToFull, fullToBasic}, nil
+	return cases, nil
 }
 
-func (c *ConfigWalker) buildTestCase(resourceType string, configList ...*gabs.Container) (testCase, error) {
+func (c *ConfigWalker) buildTestCase(resourceType string, conf *testCaseConfig, propOverrides map[string]interface{}) (testCase, error) {
 	var (
 		test  testCase
 		steps []resource.TestStep
@@ -64,15 +70,21 @@ func (c *ConfigWalker) buildTestCase(resourceType string, configList ...*gabs.Co
 	id := acctest.RandInt()
 	resourceName := fmt.Sprintf("%s.test-acc-%v", resourceType, id)
 
-	for _, conf := range configList {
-		raw, err := toHCL(conf.String())
+	for _, step := range conf.Steps {
+		copiedConf, err := gabs.ParseJSON([]byte(c.config.full.String()))
+		if err != nil {
+			return test, err
+		}
+		setOverrides(copiedConf, step, propOverrides)
+
+		raw, err := toHCL(copiedConf.String())
 		if err != nil {
 			return test, err
 		}
 		raw = wrapHCL(raw, resourceType, resourceName)
 		steps = append(steps, resource.TestStep{
 			Config: raw,
-			Check:  c.getAssertion(resourceName, conf),
+			Check:  c.getAssertion(resourceName, copiedConf),
 		})
 	}
 
@@ -83,6 +95,20 @@ func (c *ConfigWalker) buildTestCase(resourceType string, configList ...*gabs.Co
 			Steps: steps,
 		},
 	}, nil
+}
+
+func setOverrides(conf *gabs.Container, step *stepConfig, propOverrides map[string]interface{}) {
+	for key, val := range propOverrides {
+		conf.Set(val, key)
+	}
+
+	for key, val := range step.Properties {
+		conf.Set(val, key)
+	}
+
+	a := conf.Path("login").String()
+	fmt.Print(a)
+	runtime.Breakpoint()
 }
 
 func buildTestStep(config string, check resource.TestCheckFunc) resource.TestStep {
@@ -97,7 +123,8 @@ func (c *ConfigWalker) getAssertion(resourceName string, config *gabs.Container)
 
 	for i, arrKey := range c.keys {
 		strKey := strings.Join(arrKey, ".")
-		val := config.Path(strKey).String()
+		var val string
+		_ = json.Unmarshal([]byte(config.Path(strKey).String()), &val)
 
 		if val != "" {
 			arr[i] = resource.TestCheckResourceAttr(resourceName, strKey, val)
@@ -110,8 +137,9 @@ func (c *ConfigWalker) getAssertion(resourceName string, config *gabs.Container)
 // Run starts configuration test process
 func (c *ConfigWalker) Run(resourceSchema map[string]*schema.Schema) {
 	for key, value := range resourceSchema {
-		c.keys[c.index] = []string{key}
+		c.keys = append(c.keys, []string{key})
 		c.Walk(value)
+		c.index++
 	}
 }
 
@@ -128,25 +156,41 @@ func (c *ConfigWalker) Walk(value *schema.Schema) {
 			}
 		}
 	} else {
-		switch value.Type {
-		case schema.TypeMap:
+		if value.Type == schema.TypeMap {
 			// And it begins exponentially growing!
 			if value.Elem != nil {
-				for key, nestedValue := range value.Elem.(map[string]*schema.Schema) {
+				for key, nestedValue := range value.Elem.(schema.Resource).Schema {
 					c.keys[c.index] = append(c.keys[c.index], key)
 					c.Walk(nestedValue)
 					c.index++
 					c.keys = append(c.keys, []string{})
 				}
 			}
-			break
-		case schema.TypeList:
-		case schema.TypeSet:
-			// Just default to one item in the list
-			c.keys[c.index] = append(c.keys[c.index], "0")
-			c.Walk(value.Elem.(*schema.Schema))
-			c.index++
-			c.keys = append(c.keys, []string{})
+		} else if value.Type == schema.TypeList || value.Type == schema.TypeSet {
+			// // Just default to one item in the list
+			// c.config.full.Array(c.keys[c.index]...)
+			// c.config.basic.Array(c.keys[c.index]...)
+			// c.keys[c.index] = append(c.keys[c.index], "0")
+			// c.Walk(value.Elem.(*schema.Schema))
+			// c.index++
+			// c.keys = append(c.keys, []string{})
 		}
 	}
+}
+
+func getStringExample(v *schema.Schema) string {
+	switch v.Type {
+	case schema.TypeString:
+		return acctest.RandString(10)
+	case schema.TypeBool:
+		if v.Default == true {
+			return "false"
+		}
+		return "true"
+	case schema.TypeInt:
+	case schema.TypeFloat:
+		return string(acctest.RandInt())
+	}
+
+	return ""
 }

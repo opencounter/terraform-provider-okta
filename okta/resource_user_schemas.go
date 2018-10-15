@@ -85,7 +85,7 @@ func resourceUserSchemas() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.StringInSlice([]string{"base", "custom"}, false),
-				Description:  "SubSchema Type: base or custom. Example: \"base\"",
+				Description:  "SubSchema Type: base or custom",
 			},
 			"index": &schema.Schema{
 				Type:        schema.TypeString,
@@ -101,13 +101,13 @@ func resourceUserSchemas() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.StringInSlice([]string{"string", "boolean", "number", "integer", "array"}, false),
-				Description:  "Subschema type: string, boolean, number, integer, or array. Example: \"string\"",
+				Description:  "Subschema type: string, boolean, number, integer, or array",
 			},
 			"arraytype": &schema.Schema{
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.StringInSlice([]string{"string", "number", "interger", "reference"}, false),
-				Description:  "Subschema array type: string, number, interger, reference. Type field must be an array. Example: \"string\"",
+				Description:  "Subschema array type: string, number, interger, reference. Type field must be an array.",
 			},
 			"description": &schema.Schema{
 				Type:        schema.TypeString,
