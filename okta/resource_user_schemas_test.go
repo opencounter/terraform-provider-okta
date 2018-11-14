@@ -293,13 +293,8 @@ func testOktaUserSchemasExists(name string) resource.TestCheckFunc {
 			return fmt.Errorf("Error: no type found in state")
 		}
 
-		err := testUserSchemaExists(true, subschema, index)
-		if err != nil {
-			return err
-		}
-		return nil
+		return testUserSchemaExists(true, subschema, index)
 	}
-	return nil
 }
 
 func testOktaUserSchemasDestroy(s *terraform.State) error {
@@ -325,10 +320,7 @@ func testOktaUserSchemasDestroy(s *terraform.State) error {
 			return fmt.Errorf("Error: no type found in state")
 		}
 
-		err := testUserSchemaExists(false, subschema, index)
-		if err != nil {
-			return err
-		}
+		return testUserSchemaExists(false, subschema, index)
 	}
 	return nil
 }
