@@ -12,6 +12,8 @@ import (
 
 // Resource names, defined in place, used throughout the provider and tests
 const (
+	appGroupAttachment     = "okta_app_group_attachment"
+	appUserAttachment      = "okta_app_user_attachment"
 	authServer             = "okta_auth_server"
 	authServerPolicy       = "okta_auth_server_policy"
 	authServerPolicyRule   = "okta_auth_server_policy_rule"

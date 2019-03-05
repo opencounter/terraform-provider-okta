@@ -311,17 +311,7 @@ func handleAppUsers(id string, d *schema.ResourceData, client *okta.Client) []fu
 				password, _ := u["password"].(string)
 
 				asyncActionList = append(asyncActionList, func() error {
-					_, _, err := client.Application.AssignUserToApplication(id, okta.AppUser{
-						Id: uID,
-						Credentials: &okta.AppUserCredentials{
-							UserName: username,
-							Password: &okta.AppUserPasswordCredential{
-								Value: password,
-							},
-						},
-					})
-
-					return err
+					return assignUserToApp(id, uID, username, password, client)
 				})
 			}
 		}
@@ -347,6 +337,20 @@ func handleAppUsers(id string, d *schema.ResourceData, client *okta.Client) []fu
 	}
 
 	return asyncActionList
+}
+
+func assignUserToApp(appID, uID, username, password string, client *okta.Client) error {
+	_, _, err := client.Application.AssignUserToApplication(appID, okta.AppUser{
+		Id: uID,
+		Credentials: &okta.AppUserCredentials{
+			UserName: username,
+			Password: &okta.AppUserPasswordCredential{
+				Value: password,
+			},
+		},
+	})
+
+	return err
 }
 
 func resourceAppExists(d *schema.ResourceData, m interface{}) (bool, error) {

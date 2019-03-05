@@ -187,13 +187,20 @@ func createCustomNestedResourceImporter(fields []string, errMessage string) *sch
 			if len(parts) != len(fields) {
 				return nil, fmt.Errorf("Invalid resource import specifier. %s", errMessage)
 			}
+			containsID := false
 
 			for i, field := range fields {
 				if field == "id" {
 					d.SetId(parts[i])
+					containsID = true
 					continue
 				}
 				d.Set(field, parts[i])
+			}
+
+			// If the id field is not included, we assume the ID should be set to the combination of fields
+			if !containsID {
+				d.SetId(d.Id())
 			}
 
 			return []*schema.ResourceData{d}, nil
