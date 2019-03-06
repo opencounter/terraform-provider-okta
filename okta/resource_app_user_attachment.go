@@ -1,6 +1,8 @@
 package okta
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/okta/okta-sdk-golang/okta"
 )
@@ -15,7 +17,7 @@ func resourceAppUserAttachment() *schema.Resource {
 		Importer: createNestedResourceImporter([]string{"app_id", "user_id"}),
 		// For those familiar with Terraform schemas be sure to check the base application schema and/or
 		// the examples in the documentation
-		Schema: buildAppSchema(map[string]*schema.Schema{
+		Schema: map[string]*schema.Schema{
 			"app_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Description: "ID of application to associate user with.",
@@ -37,10 +39,11 @@ func resourceAppUserAttachment() *schema.Resource {
 				Optional: true,
 			},
 			"password": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "This will only be set if it is configured. It will be stored in clear text in state.",
 			},
-		}),
+		},
 	}
 }
 
@@ -62,18 +65,21 @@ func resourceAppUserAttachmentCreate(d *schema.ResourceData, m interface{}) erro
 	if err != nil {
 		return err
 	}
+	d.SetId(fmt.Sprintf("%s/%s", d.Get("app_id").(string), d.Get("user_id").(string)))
 	return resourceAppUserAttachmentRead(d, m)
 }
 
 func resourceAppUserAttachmentRead(d *schema.ResourceData, m interface{}) error {
 	client := getOktaClientFromMetadata(m)
-	resource, _, err := client.Application.GetApplicationUser(d.Get("app_id").(string), d.Get("user_id").(string), nil)
+	user, _, err := client.Application.GetApplicationUser(d.Get("app_id").(string), d.Get("user_id").(string), nil)
 	if err != nil {
 		return err
 	}
-	d.Set("scope", resource.Scope)
-	d.Set("username", resource.Credentials.UserName)
-	d.Set("password", resource.Credentials.Password)
+	d.Set("scope", user.Scope)
+	d.Set("username", user.Credentials.UserName)
+	if user.Credentials.Password != nil && user.Credentials.Password.Value != "" {
+		d.Set("password", user.Credentials.Password)
+	}
 
 	return nil
 }

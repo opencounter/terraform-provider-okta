@@ -84,7 +84,7 @@ var baseAppSchema = map[string]*schema.Schema{
 	"groups": &schema.Schema{
 		Type:        schema.TypeSet,
 		Optional:    true,
-		Elem:        &schema.Schema{Type: schema.TypeString},
+		Elem:        schema.TypeString,
 		Description: "Groups associated with the application",
 	},
 	"status": &schema.Schema{

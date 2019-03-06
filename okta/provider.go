@@ -15,19 +15,19 @@ const (
 	appGroupAttachment     = "okta_app_group_attachment"
 	appUserAttachment      = "okta_app_user_attachment"
 	authServer             = "okta_auth_server"
+	authServerClaim        = "okta_auth_server_claim"
 	authServerPolicy       = "okta_auth_server_policy"
 	authServerPolicyRule   = "okta_auth_server_policy_rule"
-	authServerClaim        = "okta_auth_server_claim"
 	authServerScope        = "okta_auth_server_scope"
 	autoLoginApp           = "okta_auto_login_app"
 	factor                 = "okta_factor"
+	groupRule              = "okta_group_rule"
 	identityProvider       = "okta_identity_provider"
 	mfaPolicy              = "okta_mfa_policy"
 	mfaPolicyRule          = "okta_mfa_policy_rule"
 	oAuthApp               = "okta_oauth_app"
 	oAuthAppRedirectUri    = "okta_oauth_app_redirect_uri"
 	oktaGroup              = "okta_group"
-	groupRule              = "okta_group_rule"
 	oktaUser               = "okta_user"
 	passwordPolicy         = "okta_password_policy"
 	passwordPolicyRule     = "okta_password_policy_rule"
@@ -38,8 +38,8 @@ const (
 	swaApp                 = "okta_swa_app"
 	threeFieldApp          = "okta_three_field_app"
 	trustedOrigin          = "okta_trusted_origin"
-	userSchema             = "okta_user_schema"
 	userBaseSchema         = "okta_user_base_schema"
+	userSchema             = "okta_user_schema"
 )
 
 // Provider establishes a client connection to an okta site
@@ -84,42 +84,45 @@ func Provider() terraform.ResourceProvider {
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
-			oktaGroup:          resourceGroup(),
-			identityProvider:   resourceIdentityProvider(),
-			passwordPolicy:     resourcePasswordPolicy(),
-			signOnPolicy:       resourceSignOnPolicy(),
-			signOnPolicyRule:   resourceSignOnPolicyRule(),
-			passwordPolicyRule: resourcePasswordPolicyRule(),
-			mfaPolicy:          resourceMfaPolicy(),
-			mfaPolicyRule:      resourceMfaPolicyRule(),
-			trustedOrigin:      resourceTrustedOrigin(),
-			// Will be deprecated
-			"okta_user_schemas":    resourceUserSchemas(),
-			userSchema:             resourceUserSchema(),
-			oktaUser:               resourceUser(),
-			oAuthApp:               resourceOAuthApp(),
-			oAuthAppRedirectUri:    resourceOAuthAppRedirectUri(),
-			samlApp:                resourceSamlApp(),
-			autoLoginApp:           resourceAutoLoginApp(),
-			securePasswordStoreApp: resourceSecurePasswordStoreApp(),
-			threeFieldApp:          resourceThreeFieldApp(),
-			swaApp:                 resourceSwaApp(),
-			factor:                 resourceFactor(),
-			groupRule:              resourceGroupRule(),
+			appGroupAttachment:     resourceAppGroupAttachment(),
+			appUserAttachment:      resourceAppUserAttachment(),
 			authServer:             resourceAuthServer(),
 			authServerClaim:        resourceAuthServerClaim(),
 			authServerPolicy:       resourceAuthServerPolicy(),
 			authServerPolicyRule:   resourceAuthServerPolicyRule(),
 			authServerScope:        resourceAuthServerScope(),
+			autoLoginApp:           resourceAutoLoginApp(),
+			factor:                 resourceFactor(),
+			groupRule:              resourceGroupRule(),
+			identityProvider:       resourceIdentityProvider(),
+			mfaPolicy:              resourceMfaPolicy(),
+			mfaPolicyRule:          resourceMfaPolicyRule(),
+			oAuthApp:               resourceOAuthApp(),
+			oAuthAppRedirectUri:    resourceOAuthAppRedirectUri(),
+			oktaGroup:              resourceGroup(),
+			oktaUser:               resourceUser(),
+			passwordPolicy:         resourcePasswordPolicy(),
+			passwordPolicyRule:     resourcePasswordPolicyRule(),
+			samlApp:                resourceSamlApp(),
+			securePasswordStoreApp: resourceSecurePasswordStoreApp(),
+			signOnPolicy:           resourceSignOnPolicy(),
+			signOnPolicyRule:       resourceSignOnPolicyRule(),
+			swaApp:                 resourceSwaApp(),
+			threeFieldApp:          resourceThreeFieldApp(),
+			trustedOrigin:          resourceTrustedOrigin(),
+			userSchema:             resourceUserSchema(),
+
+			// Will be deprecated
+			"okta_user_schemas": resourceUserSchemas(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			authServer:              dataSourceAuthServer(),
-			"okta_everyone_group":   dataSourceEveryoneGroup(),
+			"okta_app":              dataSourceApp(),
 			"okta_default_policies": deprecatedPolicies,
 			"okta_default_policy":   dataSourceDefaultPolicies(),
-			"okta_policy":           dataSourcePolicy(),
+			"okta_everyone_group":   dataSourceEveryoneGroup(),
 			"okta_group":            dataSourceGroup(),
-			"okta_app":              dataSourceApp(),
+			"okta_policy":           dataSourcePolicy(),
 			"okta_user":             dataSourceUser(),
 		},
 
