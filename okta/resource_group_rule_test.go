@@ -80,3 +80,26 @@ func TestAccOktaGroupRuleCrud(t *testing.T) {
 		},
 	})
 }
+
+// Issue 162
+func TestAccOktaGroupRuleIssue162(t *testing.T) {
+	ri := acctest.RandInt()
+	resourceName := fmt.Sprintf("%s.test", groupRule)
+	mgr := newFixtureManager("okta_group_rule")
+	config := mgr.GetFixtures("test_issue_162.tf", ri, t)
+	name := buildResourceName(ri)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", name),
+					resource.TestCheckResourceAttr(resourceName, "status", "ACTIVE"),
+				),
+			},
+		},
+	})
+}
