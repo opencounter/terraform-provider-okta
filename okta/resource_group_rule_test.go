@@ -96,10 +96,27 @@ func TestAccOktaGroupRuleIssue162(t *testing.T) {
 			{
 				Config: config,
 				Check: resource.ComposeTestCheckFunc(
+					ensureResourceExists(resourceName, groupRuleExist),
 					resource.TestCheckResourceAttr(resourceName, "name", name),
 					resource.TestCheckResourceAttr(resourceName, "status", "ACTIVE"),
 				),
 			},
 		},
 	})
+}
+
+func groupRuleExist(id string) (bool, error) {
+	client := getOktaClientFromMetadata(testAccProvider.Meta())
+	_, response, err := client.Group.GetRule(id)
+
+	// We don't want to consider a 404 an error in some cases and thus the delineation
+	if response.StatusCode == 404 {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, responseErr(response, err)
+	}
+
+	return true, err
 }
