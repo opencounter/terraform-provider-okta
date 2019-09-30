@@ -59,6 +59,9 @@ type (
 		Type         string                  `json:"type,omitempty"`
 		Union        string                  `json:"union,omitempty"`
 		ExternalName string                  `json:"externalName,omitempty"`
+		Unique       string                  `json:"unique,omitempty"`
+		Minimum      *int                    `json:"minimum,omitempty"`
+		Maximum      *int                    `json:"maximum,omitempty"`
 	}
 
 	UserSubSchemaProperties struct {

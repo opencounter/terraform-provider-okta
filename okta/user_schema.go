@@ -137,6 +137,21 @@ var (
 			Description: "Subschema external name",
 			ForceNew:    true,
 		},
+		"unique": &schema.Schema{
+			Type:        schema.TypeBool,
+			Optional:    true,
+			Description: "Enforce uniqueness constraint",
+		},
+		"minimum": &schema.Schema{
+			Type:        schema.TypeInt,
+			Optional:    true,
+			Description: "Minimum value (if number/integer)",
+		},
+		"maximum": &schema.Schema{
+			Type:        schema.TypeInt,
+			Optional:    true,
+			Description: "Maximum value (if number/integer)",
+		},
 	}
 
 	userBaseSchemaSchema = map[string]*schema.Schema{
@@ -197,7 +212,12 @@ func syncUserSchema(d *schema.ResourceData, subschema *sdk.UserSubSchema) error 
 	d.Set("max_length", subschema.MaxLength)
 	d.Set("scope", subschema.Scope)
 	d.Set("external_name", subschema.ExternalName)
+	d.Set("maximum", subschema.Maximum)
+	d.Set("minimum", subschema.Minimum)
 
+	if subschema.Unique != "" {
+		d.Set("unique", true)
+	}
 	if subschema.Items != nil {
 		d.Set("array_type", subschema.Items.Type)
 	}
@@ -298,6 +318,10 @@ func flattenOneOf(oneOf []*sdk.UserSchemaEnum) []interface{} {
 }
 
 func getUserSubSchema(d *schema.ResourceData) *sdk.UserSubSchema {
+	unique := ""
+	if d.Get("unique").(bool) {
+		unique = "UNIQUE_VALIDATED"
+	}
 	return &sdk.UserSubSchema{
 		Title:       d.Get("title").(string),
 		Type:        d.Get("type").(string),
@@ -317,5 +341,8 @@ func getUserSubSchema(d *schema.ResourceData) *sdk.UserSubSchema {
 		MaxLength:    getNullableInt(d, "max_length"),
 		OneOf:        getNullableOneOf(d, "one_of"),
 		ExternalName: d.Get("external_name").(string),
+		Unique:       unique,
+		Minimum:      getNullableInt(d, "minimum"),
+		Maximum:      getNullableInt(d, "maximum"),
 	}
 }
